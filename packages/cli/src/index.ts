@@ -1,4 +1,6 @@
 import { cli } from "cleye";
+import { outro } from "@clack/prompts";
+import { red } from "kolorist";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -12,6 +14,7 @@ import setupCommand from "~/commands/setup.js";
 import summaryCommand from "~/commands/summary.js";
 import prepareCommitMessageHook from "~/commands/prepare-commit-msg-hook.js";
 import { runCommitWithPush } from "~/commands/commit.js";
+import { handleCliError } from "~/errors.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -45,7 +48,18 @@ if (isCalledFromGitHook) {
       ignoreArgv: (type) => type === "unknown-flag" || type === "argument",
     },
     async (_argv) => {
-      await runCommitWithPush(undefined, [], true, undefined, rawArgv, true);
+      await runCommitWithPush(
+        undefined,
+        [],
+        true,
+        undefined,
+        rawArgv,
+        true,
+      ).catch((error) => {
+        outro(`${red("×")} ${error.message}`);
+        handleCliError(error);
+        process.exit(1);
+      });
     },
     rawArgv,
   );

@@ -1,6 +1,6 @@
 {
   "name": "dash-git",
-  "version": "1.6.4",
+  "version": "1.6.7",
   "description": "AI-powered Git CLI for commit messages, PRs, and issues",
   "license": "MIT",
   "type": "module",
