@@ -5,7 +5,7 @@ AI-powered Git CLI for commit messages, PRs, and GitHub workflows.
 ## Install
 
 ```bash
-npm install -g dash-cli
+npm install -g dash-git
 ```
 
 Then run:
@@ -234,7 +234,7 @@ export PATH="$(npm bin -g):$PATH"
 ## Development
 
 ```bash
-git clone https://github.com/koushikxd/dash-cli.git
+git clone https://github.com/koushikxd/dash-git.git
 cd dash/packages/cli
 
 pnpm install

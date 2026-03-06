@@ -1,5 +1,5 @@
 {
-  "name": "dash-cli",
+  "name": "dash-git",
   "version": "1.6.2",
   "description": "AI-powered Git CLI for commit messages, PRs, and issues",
   "license": "MIT",
@@ -9,11 +9,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/koushikxd/dash-cli.git",
+    "url": "https://github.com/koushikxd/dash-git.git",
     "directory": "packages/cli"
   },
   "bugs": {
-    "url": "https://github.com/koushikxd/dash-cli/issues"
+    "url": "https://github.com/koushikxd/dash-git/issues"
   },
   "main": "dist/index.js",
   "module": "dist/index.js",

@@ -23,7 +23,7 @@ dash is a command-line tool designed to streamline your Git commit process by ge
 Install dash globally using npm:
 
 ```bash
-npm install -g dash-cli
+npm install -g dash-git
 ```
 
 After installation, you can run `dash` from any terminal.

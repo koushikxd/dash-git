@@ -56,7 +56,7 @@ export function NpmDownloads() {
 
       const today = new Date().toISOString().split("T")[0];
       const startDate = new Date("2024-12-01").toISOString().split("T")[0];
-      const url = `https://api.npmjs.org/downloads/point/${startDate}:${today}/dash-cli`;
+      const url = `https://api.npmjs.org/downloads/point/${startDate}:${today}/dash-git`;
 
       try {
         const response = await fetch(url);
@@ -92,7 +92,7 @@ export function NpmDownloads() {
   return (
     <Link
       className="group outline-none"
-      href="https://www.npmjs.com/package/dash-cli"
+      href="https://www.npmjs.com/package/dash-git"
     >
       <div
         className={cn(

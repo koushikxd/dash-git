@@ -83,14 +83,14 @@ export default function Page() {
               </Link>
               <div className="flex gap-4">
                 <Link
-                  href="https://github.com/koushikxd/dash-cli"
+                  href="https://github.com/koushikxd/dash-git"
                   className="hover:text-foreground transition-colors"
                   target="_blank"
                 >
                   [github]
                 </Link>
                 <Link
-                  href="https://www.npmjs.com/package/dash-cli"
+                  href="https://www.npmjs.com/package/dash-git"
                   className="hover:text-foreground transition-colors"
                   target="_blank"
                 >

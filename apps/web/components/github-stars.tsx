@@ -56,7 +56,7 @@ export function GithubStars() {
 
       try {
         const response = await fetch(
-          "https://api.github.com/repos/koushikxd/dash-cli"
+          "https://api.github.com/repos/koushikxd/dash-git",
         );
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
@@ -66,7 +66,7 @@ export function GithubStars() {
         setCookie(COOKIE_NAME, data.stargazers_count.toString());
         if (typeof document !== "undefined") {
           document.cookie = `${COOKIE_TIMESTAMP}=${Date.now()}; expires=${new Date(
-            Date.now() + ONE_HOUR
+            Date.now() + ONE_HOUR,
           ).toUTCString()}; path=/; SameSite=Lax`;
         }
         setIsLoaded(true);
@@ -85,12 +85,12 @@ export function GithubStars() {
   return (
     <Link
       className="group outline-none"
-      href="https://github.com/koushikxd/dash-cli"
+      href="https://github.com/koushikxd/dash-git"
     >
       <div
         className={cn(
           "text-muted-foreground/80 flex items-center gap-2 font-mono transition-opacity duration-300 select-none group-hover:underline md:text-sm",
-          isLoaded ? "opacity-100" : "opacity-0"
+          isLoaded ? "opacity-100" : "opacity-0",
         )}
       >
         <HugeiconsIcon className="size-4" icon={GithubIcon} strokeWidth={1.5} />

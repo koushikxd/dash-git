@@ -12,7 +12,7 @@ import { cn } from "~/styles/utils";
 export function InstallCommand() {
   const [copied, setCopied] = React.useState(false);
 
-  const command = "npm install -g dash-cli";
+  const command = "npm install -g dash-git";
 
   const handleCopy = () => {
     navigator.clipboard
@@ -31,7 +31,7 @@ export function InstallCommand() {
         onClick={handleCopy}
       >
         npm install -g&nbsp;
-        <span className="text-foreground">dash-cli</span>
+        <span className="text-foreground">dash-git</span>
         <span
           className={cn(
             "absolute right-2 ml-4 inline-flex items-center transition-opacity",

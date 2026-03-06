@@ -15,7 +15,7 @@ Install dash in under a minute.
 ## Install
 
 ```bash
-npm install -g dash-cli
+npm install -g dash-git
 ```
 
 Done. Now run:
@@ -68,7 +68,7 @@ dash commit
 ## Update dash
 
 ```bash
-npm update -g dash-cli
+npm update -g dash-git
 ```
 
-**Need help?** Check the [FAQ](/docs/reference/faq) or [open an issue](https://github.com/koushikxd/dash-cli/issues).
+**Need help?** Check the [FAQ](/docs/reference/faq) or [open an issue](https://github.com/koushikxd/dash-git/issues).

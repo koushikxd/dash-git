@@ -12,12 +12,12 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/gh",
-        destination: "https://github.com/koushikxd/dash-cli",
+        destination: "https://github.com/koushikxd/dash-git",
         permanent: true,
       },
       {
         source: "/npm",
-        destination: "https://www.npmjs.com/package/dash-cli",
+        destination: "https://www.npmjs.com/package/dash-git",
         permanent: true,
       },
     ];

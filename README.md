@@ -5,7 +5,7 @@ AI-powered Git CLI. Generate commit messages, create PRs, manage issues—all fr
 ## Install
 
 ```bash
-npm install -g dash-cli
+npm install -g dash-git
 ```
 
 > **Linux users:** If `dash` runs the system shell instead of this CLI, use `dash-cli` instead.
@@ -132,7 +132,7 @@ Dash uses these instead of default prompts. Works with monorepos—searches up t
 
 ## Documentation
 
-Full docs at [koushikxd.github.io/dash-cli](https://koushikxd.github.io/dash-cli)
+Full docs at [koushikxd.github.io/dash-git](https://koushikxd.github.io/dash-git)
 
 ## Requirements
 

@@ -96,14 +96,14 @@ async function release() {
   await $`cd packages/cli && npm publish --access public`;
 
   console.log("\ndeprecating old package...");
-  await $`npm deprecate @koushik_xd/dash@"*" "Package moved to dash-cli. Install: npm install -g dash-cli"`;
+  await $`npm deprecate @koushik_xd/dash@"*" "Package moved to dash-git. Install: npm install -g dash-git"`;
 
   console.log("\npushing to git...");
   await $`git push && git push --tags`;
 
   console.log(`\n✨ release v${newVersion} complete!`);
   console.log(
-    `view on npm: https://www.npmjs.com/package/dash-cli/v/${newVersion}`,
+    `view on npm: https://www.npmjs.com/package/dash-git/v/${newVersion}`,
   );
 }
 

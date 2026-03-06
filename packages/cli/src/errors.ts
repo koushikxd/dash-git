@@ -12,9 +12,8 @@ export const handleCliError = (error: unknown) => {
     }
     console.error(`\n${indent}${dim(`dash v${packageJson.version}`)}`);
     console.error(
-      `\n${indent}Please open a Bug report with the information above:`
+      `\n${indent}Please open a Bug report with the information above:`,
     );
-    console.error(`${indent}https://github.com/koushikxd/dash-cli/issues/new`);
+    console.error(`${indent}https://github.com/koushikxd/dash-git/issues/new`);
   }
 };
-
