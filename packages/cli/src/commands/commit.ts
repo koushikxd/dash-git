@@ -1,7 +1,16 @@
 import { command } from "cleye";
 import { execa } from "execa";
 import { black, green, red, bgCyan } from "kolorist";
-import { intro, outro, spinner, text, isCancel, confirm } from "@clack/prompts";
+import {
+  intro,
+  outro,
+  spinner,
+  text,
+  isCancel,
+  confirm,
+  select,
+  multiselect,
+} from "@clack/prompts";
 import {
   assertGitRepo,
   getStagedDiff,
@@ -13,11 +22,20 @@ import {
   getDetectedMessage,
   getDiffSummary,
   buildCompactSummary,
+  getChangedFiles,
+  stageAllChanges,
+  stageSelectedFiles,
+  type ChangedFile,
 } from "~/utils/git.js";
 import { getConfig } from "~/utils/config.js";
 import { generateCommitMessageFromSummary } from "~/utils/groq.js";
 import { KnownError, handleCliError } from "~/errors.js";
 import { getCommitPromptFile } from "~/utils/prompt.js";
+
+export interface CommitMessageParts {
+  subject: string;
+  body: string;
+}
 
 const buildDiffSnippets = async (
   files: string[],
@@ -112,7 +130,7 @@ const buildNoChangesMessage = async (stageAll: boolean) => {
     }
   }
 
-  return `No staged changes found. Stage your changes with \`git add\` or use \`--all\` to stage tracked files automatically.${hint}`;
+  return `No staged changes found. Stage your changes with \`git add\`, run \`dash\` for interactive staging, or use \`--all\` to stage everything.${hint}`;
 };
 
 export const buildSingleCommitPrompt = async (
@@ -120,25 +138,43 @@ export const buildSingleCommitPrompt = async (
   compactSummary: string,
   maxLength: number,
   customPrompt?: string | null,
+  messageContext?: string | null,
 ): Promise<string> => {
   const snippets = await buildDiffSnippets(files, 30, 3500);
+  const contextSection = messageContext?.trim()
+    ? `\nUSER CONTEXT (helpful guidance, but never override the actual diff):\n${messageContext.trim()}\n`
+    : "";
 
   if (customPrompt) {
-    return `${customPrompt}
+    return (
+      `${customPrompt}
 
 CHANGES SUMMARY:
 ${compactSummary}
 
+${contextSection}
 ${snippets ? `\n${snippets}\n` : ""}
 
-Maximum ${maxLength} characters. Return only the commit message line, no explanations.`;
+COMMIT FORMAT RULES:
+- If the diff is focused, return a single-line commit message only
+- If there are several distinct meaningful changes, return:
+  type: short summary
+
+  - change 1
+  - change 2
+- Keep the subject line under ${maxLength} characters
+- Use ` -
+      ` bullets for the body when needed
+- Return only the commit message, no explanations.`
+    );
   }
 
-  return `Analyze the following git changes and generate a single, complete conventional commit message.
+  return `Analyze the following git changes and generate a complete conventional commit message.
 
 CHANGES SUMMARY:
 ${compactSummary}
 
+${contextSection}
 ${snippets ? `\n${snippets}\n` : ""}
 
 CRITICAL - READ CAREFULLY:
@@ -151,12 +187,21 @@ CRITICAL - READ CAREFULLY:
 TASK: Write ONE conventional commit message describing ONLY what the diff shows.
 
 REQUIREMENTS:
-- Format: type: subject (NO scope, just type and subject)
-- Maximum ${maxLength} characters
+- Always start with: type: subject (NO scope, just type and subject)
+- Keep the subject line under ${maxLength} characters
 - Describe the actual code change, not assumed functionality
 - Use imperative mood, present tense ("add" not "added")
 - Include the main component/area affected when clear
 - Complete the message - never truncate mid-sentence
+- If the changes are small or tightly related, return a single-line commit message only
+- If the changes are broad and cover multiple distinct areas, return:
+  type: short summary
+
+  - change 1
+  - change 2
+  - change 3
+- Use bullet lines ONLY for major distinct changes
+- Each body line must start with "- "
 
 COMMIT TYPE SELECTION:
 - feat: ONLY for genuinely NEW user-facing features (new components, new API endpoints, new functionality)
@@ -178,7 +223,162 @@ WRONG EXAMPLES (hallucinating features not in diff):
 - "feat: add collapsible sidebar" when diff only shows CSS
 - "feat: implement new dashboard" when diff shows layout tweaks
 
-Return only the commit message line, no explanations.`;
+Return only the commit message, no explanations.`;
+};
+
+export const splitCommitMessage = (message: string): CommitMessageParts => {
+  const normalized = message.replace(/\r\n/g, "\n").trim();
+  const [subjectLine, ...rest] = normalized.split("\n");
+  const subject = subjectLine?.trim() || "";
+  const body = rest.join("\n").trim();
+
+  return { subject, body };
+};
+
+export const formatCommentedCommitMessage = (message: string) =>
+  message
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => (line.length > 0 ? `# ${line}` : "#"))
+    .join("\n");
+
+export const buildGitCommitArgs = (message: string): string[] => {
+  const { subject, body } = splitCommitMessage(message);
+
+  if (!subject) {
+    throw new KnownError("Commit message cannot be empty");
+  }
+
+  return body
+    ? ["commit", "-m", subject, "-m", body]
+    : ["commit", "-m", subject];
+};
+
+export const stageModes = {
+  promptOnEmpty: "prompt-on-empty",
+  alwaysPrompt: "always-prompt",
+  neverPrompt: "never-prompt",
+} as const;
+
+type StageMode = (typeof stageModes)[keyof typeof stageModes];
+
+const hasHeadCommit = async (): Promise<boolean> => {
+  const { failed } = await execa("git", ["rev-parse", "--verify", "HEAD"], {
+    reject: false,
+  });
+
+  return !failed;
+};
+
+const resetIndexToHead = async () => {
+  if (await hasHeadCommit()) {
+    await execa("git", ["reset", "--quiet", "HEAD"]);
+    return;
+  }
+
+  const stagedFiles = await getRawStagedFiles();
+  if (stagedFiles.length === 0) return;
+
+  await execa(
+    "git",
+    ["rm", "--cached", "-r", "--quiet", "--", ...stagedFiles],
+    {
+      reject: false,
+    },
+  );
+};
+
+const getFileHint = (file: ChangedFile) => {
+  if (file.untracked) return "untracked";
+  if (file.originalPath) return `renamed from ${file.originalPath}`;
+  if (file.indexStatus === "D" || file.worktreeStatus === "D") return "deleted";
+  if (file.indexStatus === "A") return "staged new file";
+  if (file.staged && file.unstaged) return "staged + unstaged";
+  if (file.staged) return "staged";
+  if (file.unstaged) return "modified";
+  return "changed";
+};
+
+const promptForChangedFiles = async (files: ChangedFile[]) => {
+  const selected = await multiselect({
+    message: "Select files to stage (Space to toggle, Enter to submit)",
+    options: files.map((file) => ({
+      value: file.path,
+      label: file.path,
+      hint: getFileHint(file),
+    })),
+    initialValues: files.filter((file) => file.staged).map((file) => file.path),
+    required: true,
+  });
+
+  if (isCancel(selected)) {
+    outro("Commit cancelled");
+    return null;
+  }
+
+  const selectedPaths = new Set(selected as string[]);
+  return files.filter((file) => selectedPaths.has(file.path));
+};
+
+const promptForStageStrategy = async (
+  files: ChangedFile[],
+  mode: StageMode,
+) => {
+  if (mode === stageModes.neverPrompt) {
+    return undefined;
+  }
+
+  const hasStagedFiles = files.some((file) => file.staged);
+
+  if (mode === stageModes.promptOnEmpty && hasStagedFiles) {
+    return undefined;
+  }
+
+  if (files.length === 0) {
+    return undefined;
+  }
+
+  const action = await select({
+    message: hasStagedFiles
+      ? "Choose how to prepare this commit"
+      : "No staged files found. How would you like to stage changes?",
+    initialValue: "all",
+    options: [
+      {
+        value: "all",
+        label: "Stage all changed files",
+        hint: "Default",
+      },
+      {
+        value: "manual",
+        label: "Select files manually",
+        hint: "Choose files with Space",
+      },
+      {
+        value: "cancel",
+        label: "Cancel",
+      },
+    ],
+  });
+
+  if (isCancel(action) || action === "cancel") {
+    outro("Commit cancelled");
+    return null;
+  }
+
+  if (action === "all") {
+    await stageAllChanges();
+    return "all";
+  }
+
+  const selectedFiles = await promptForChangedFiles(files);
+  if (selectedFiles === null) {
+    return null;
+  }
+
+  await resetIndexToHead();
+  await stageSelectedFiles(selectedFiles);
+  return "manual";
 };
 
 export const runCommitWithPush = async (
@@ -186,16 +386,25 @@ export const runCommitWithPush = async (
   excludeFiles: string[],
   stageAll: boolean,
   commitType: string | undefined,
-  rawArgv: string[],
+  messageContext: string | undefined,
   promptForPush: boolean = false,
+  stageMode: StageMode = stageModes.neverPrompt,
 ) => {
   intro(bgCyan(black(" dash commit ")));
   await assertGitRepo();
 
   const detectingFiles = spinner();
+  let stagedAllChanges = stageAll;
 
   if (stageAll) {
-    await execa("git", ["add", "--all"]);
+    await stageAllChanges();
+  } else {
+    const changedFiles = await getChangedFiles();
+    const stagingResult = await promptForStageStrategy(changedFiles, stageMode);
+    if (stagingResult === null) {
+      return;
+    }
+    stagedAllChanges = stagingResult === "all";
   }
 
   detectingFiles.start("Detecting staged files");
@@ -203,7 +412,7 @@ export const runCommitWithPush = async (
 
   if (!staged) {
     const rawStaged = await getRawStagedFiles();
-    const statusMessage = await buildNoChangesMessage(stageAll);
+    const statusMessage = await buildNoChangesMessage(stagedAllChanges);
     detectingFiles.stop("Detecting staged files");
     if (rawStaged.length > 0) {
       throw new KnownError(
@@ -265,6 +474,7 @@ export const runCommitWithPush = async (
         compact,
         config["max-length"],
         customPrompt,
+        messageContext,
       );
       messages = await generateCommitMessageFromSummary(
         config.GROQ_API_KEY,
@@ -284,6 +494,7 @@ export const runCommitWithPush = async (
         `Files: ${fileList}`,
         config["max-length"],
         customPrompt,
+        messageContext,
       );
       messages = await generateCommitMessageFromSummary(
         config.GROQ_API_KEY,
@@ -306,22 +517,78 @@ export const runCommitWithPush = async (
   }
 
   const generatedMessage = messages[0];
+  if (!generatedMessage) {
+    throw new KnownError("No commit messages were generated. Try again.");
+  }
+  const generatedParts = splitCommitMessage(generatedMessage);
+  let finalMessage = generatedMessage.trim();
 
-  const edited = await text({
-    message: "Commit message (edit or press Enter to commit):",
-    initialValue: generatedMessage,
-    validate: (value) =>
-      value && value.trim().length > 0 ? undefined : "Message cannot be empty",
-  });
+  if (!generatedParts.body) {
+    const edited = await text({
+      message: "Commit message (edit or press Enter to commit):",
+      initialValue: generatedParts.subject,
+      validate: (value) =>
+        value && value.trim().length > 0
+          ? undefined
+          : "Message cannot be empty",
+    });
 
-  if (isCancel(edited)) {
-    outro("Commit cancelled");
-    return;
+    if (isCancel(edited)) {
+      outro("Commit cancelled");
+      return;
+    }
+
+    finalMessage = String(edited).trim();
+  } else {
+    console.log("\nGenerated multi-line commit message:\n");
+    console.log(finalMessage);
+    console.log();
+
+    const multilineAction = await select({
+      message: "Use this multi-line commit message?",
+      initialValue: "commit",
+      options: [
+        {
+          value: "commit",
+          label: "Commit with this message",
+        },
+        {
+          value: "subject",
+          label: "Edit subject line only",
+          hint: "Keep bullet list as generated",
+        },
+        {
+          value: "cancel",
+          label: "Cancel",
+        },
+      ],
+    });
+
+    if (isCancel(multilineAction) || multilineAction === "cancel") {
+      outro("Commit cancelled");
+      return;
+    }
+
+    if (multilineAction === "subject") {
+      const editedSubject = await text({
+        message: "Edit commit subject line:",
+        initialValue: generatedParts.subject,
+        validate: (value) =>
+          value && value.trim().length > 0
+            ? undefined
+            : "Message cannot be empty",
+      });
+
+      if (isCancel(editedSubject)) {
+        outro("Commit cancelled");
+        return;
+      }
+
+      finalMessage = `${String(editedSubject).trim()}\n\n${generatedParts.body}`;
+    }
   }
 
-  const finalMessage = String(edited).trim();
-
-  await execa("git", ["commit", "-m", finalMessage, ...rawArgv]);
+  await execa("git", buildGitCommitArgs(finalMessage));
 
   outro(`${green("√")} Successfully committed!`);
 
@@ -353,12 +620,14 @@ export const runCommitWithPush = async (
         pushSpinner.stop("Pushed to remote");
         const output = [stdout, stderr].filter(Boolean).join("\n");
         if (output) {
-          console.log("\n" + output.trim() + "\n");
+          console.log(`\n${output.trim()}\n`);
         }
         outro(`${green("√")} Successfully pushed to remote!`);
-      } catch (error: any) {
+      } catch (error: unknown) {
         pushSpinner.stop("Push failed");
-        outro(`${red("×")} Failed to push: ${error.message}`);
+        const message =
+          error instanceof Error ? error.message : "Unknown push error";
+        outro(`${red("×")} Failed to push: ${message}`);
       }
     } else {
       outro("Changes not pushed");
@@ -395,20 +664,26 @@ export default command(
         description: "Type of commit message to generate",
         alias: "t",
       },
+      message: {
+        type: String,
+        description: "Additional context for AI commit message generation",
+        alias: "m",
+      },
     },
     ignoreArgv: (type) => type === "unknown-flag" || type === "argument",
   },
   (argv) => {
-    const rawArgv = process.argv.slice(3);
     runCommitWithPush(
       argv.flags.generate,
       argv.flags.exclude,
       argv.flags.all,
       argv.flags.type,
-      rawArgv,
+      argv.flags.message,
       true,
-    ).catch((error: any) => {
-      outro(`${red("×")} ${error.message}`);
+      stageModes.promptOnEmpty,
+    ).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      outro(`${red("×")} ${message}`);
       handleCliError(error);
       process.exit(1);
     });

@@ -30,35 +30,46 @@ dash config set GROQ_API_KEY=gsk_your_key_here
 
 dash setup
 
-git add .
+dash
 dash commit
+dash c -m "chore: hide testimonials"
 
 dash pr
 ```
 
 ## Commands
 
-### `dash commit`
+### `dash commit` / `dash c`
 
 ```bash
-dash commit [-g <n>] [-x <files>] [-a] [-t <type>]
+dash commit [-g <n>] [-x <files>] [-a] [-t <type>] [-m <context>]
 ```
 
 | Flag                    | Description                  |
 | ----------------------- | ---------------------------- |
 | `-g, --generate <n>`    | Generate n messages (max: 5) |
 | `-x, --exclude <files>` | Exclude files                |
-| `-a, --all`             | Stage all tracked files      |
+| `-a, --all`             | Stage all changed files      |
 | `-t, --type <type>`     | Use `conventional` format    |
+| `-m, --message <text>`  | Extra AI context for message |
 
 Examples:
 
 ```bash
+dash
 dash commit
+dash c
+dash commit -m "chore: hide testimonials"
 dash commit --all
 dash commit --exclude dist/ --generate 3
 dash commit --type conventional
 ```
+
+`dash` opens a staging selector before it commits. "Stage all changed files" is selected by default, and you can switch to manual mode with the arrow keys to choose files with `Space` and submit with `Enter`.
+
+`dash commit` uses your current staged changes. If nothing is staged, it now asks whether you want to stage everything or select files manually before generating the commit message.
+
+For larger diffs, dash can generate a multi-line commit message with a conventional subject line plus `- ` bullet points for the major changes.
 
 ### `dash pr`
 
@@ -125,7 +136,7 @@ Examples:
 
 ```bash
 dash config set GROQ_API_KEY=gsk_xxx
-dash config set model=llama-3.3-70b-versatile
+dash config set model=openai/gpt-oss-120b
 dash config get GROQ_API_KEY model
 ```
 

@@ -70,30 +70,118 @@ export const getRawStagedFiles = async (): Promise<string[]> => {
   return stdout.split("\n").filter(Boolean);
 };
 
+export interface ChangedFile {
+  path: string;
+  originalPath?: string;
+  indexStatus: string;
+  worktreeStatus: string;
+  staged: boolean;
+  unstaged: boolean;
+  untracked: boolean;
+  pathspecs: string[];
+}
+
+const renameStatuses = new Set(["R", "C"]);
+
+const parseStatusEntry = (
+  entry: string,
+  originalPath?: string,
+): ChangedFile => {
+  const indexStatus = entry[0] ?? " ";
+  const worktreeStatus = entry[1] ?? " ";
+  const path = entry.slice(3);
+  const pathspecs = [path];
+
+  if (originalPath) {
+    pathspecs.push(originalPath);
+  }
+
+  return {
+    path,
+    originalPath,
+    indexStatus,
+    worktreeStatus,
+    staged:
+      indexStatus !== " " && indexStatus !== "?" && indexStatus !== undefined,
+    unstaged: worktreeStatus !== " " && worktreeStatus !== undefined,
+    untracked: indexStatus === "?" && worktreeStatus === "?",
+    pathspecs,
+  };
+};
+
+export const parseChangedFiles = (statusOutput: string): ChangedFile[] => {
+  if (!statusOutput) return [];
+
+  const entries = statusOutput.split("\0").filter(Boolean);
+  const files: ChangedFile[] = [];
+
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index];
+    if (!entry) continue;
+    const indexStatus = entry[0] ?? " ";
+    const worktreeStatus = entry[1] ?? " ";
+    const hasOriginalPath =
+      renameStatuses.has(indexStatus) || renameStatuses.has(worktreeStatus);
+
+    if (hasOriginalPath) {
+      const originalPath = entries[index + 1];
+      files.push(parseStatusEntry(entry, originalPath));
+      index++;
+      continue;
+    }
+
+    files.push(parseStatusEntry(entry));
+  }
+
+  return files;
+};
+
+export const getChangedFiles = async (): Promise<ChangedFile[]> => {
+  const { stdout } = await execa("git", [
+    "status",
+    "--porcelain=v1",
+    "-z",
+    "--untracked-files=all",
+  ]);
+
+  return parseChangedFiles(stdout);
+};
+
 export const getWorkingTreeStatus = async () => {
-  const { stdout } = await execa("git", ["status", "--porcelain"]);
-  const lines = stdout.split("\n").filter(Boolean);
+  const files = await getChangedFiles();
   let staged = 0;
   let unstaged = 0;
   let untracked = 0;
 
-  for (const line of lines) {
-    if (line.startsWith("??")) {
+  for (const file of files) {
+    if (file.untracked) {
       untracked++;
       continue;
     }
-    const indexStatus = line[0];
-    const worktreeStatus = line[1];
-    if (indexStatus !== " " && indexStatus !== "?") staged++;
-    if (worktreeStatus !== " ") unstaged++;
+    if (file.staged) staged++;
+    if (file.unstaged) unstaged++;
   }
 
   return {
     staged,
     unstaged,
     untracked,
-    total: lines.length,
+    total: files.length,
   };
+};
+
+const deduplicatePathspecs = (files: ChangedFile[]) =>
+  Array.from(new Set(files.flatMap((file) => file.pathspecs))).filter(Boolean);
+
+export const stageAllChanges = async () => {
+  await execa("git", ["add", "--all"]);
+};
+
+export const stageSelectedFiles = async (files: ChangedFile[]) => {
+  const pathspecs = deduplicatePathspecs(files);
+  if (pathspecs.length === 0) return;
+
+  await execa("git", ["add", "--all", "--", ...pathspecs]);
 };
 
 export const getDetectedMessage = (files: string[]) =>
@@ -122,10 +210,10 @@ export const chunkDiff = (diff: string, maxTokens: number = 4000): string[] => {
 
     if (currentTokens + lineTokens > maxTokens && currentChunk.length > 0) {
       chunks.push(currentChunk.trim());
-      currentChunk = line + "\n";
+      currentChunk = `${line}\n`;
       currentTokens = lineTokens;
     } else {
-      currentChunk += line + "\n";
+      currentChunk += `${line}\n`;
       currentTokens += lineTokens;
     }
   }
@@ -188,9 +276,9 @@ export const splitDiffByFile = (diff: string): string[] => {
   for (const line of lines) {
     if (line.startsWith("diff --git ")) {
       if (current.trim().length > 0) parts.push(current.trim());
-      current = line + "\n";
+      current = `${line}\n`;
     } else {
-      current += line + "\n";
+      current += `${line}\n`;
     }
   }
   if (current.trim().length > 0) parts.push(current.trim());

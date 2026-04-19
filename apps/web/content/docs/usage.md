@@ -14,12 +14,14 @@ dash
 ```
 
 The fastest way to commit. Simply run `dash` and it will:
-1. Auto-stage all tracked files
+1. Ask whether to stage all changed files or select files manually
 2. Generate a commit message
 3. Let you edit or accept it
 4. Ask if you want to push to remote
 
 Press **Enter** to push, **Esc** to skip pushing.
+
+"Stage all changed files" is selected by default. Switch to manual mode with the arrow keys, then use **Space** to pick files and **Enter** to submit.
 
 ### Basic use
 
@@ -32,13 +34,33 @@ Dash shows you a message. Use it, edit it, or cancel. After committing, prompts 
 
 Press **Enter** to push, **Esc** to skip pushing.
 
+If no files are staged, dash asks whether to stage all changes or open a manual file picker first.
+
+For larger diffs, dash may generate a multi-line commit message with a standard `type: subject` first line and `- ` bullets for each major change.
+
+### Commit alias
+
+```bash
+dash c
+```
+
+Short alias for `dash commit`.
+
+### Extra context for AI
+
+```bash
+dash commit -m "chore: hide testimonials"
+```
+
+Passes your note to the AI as extra context so it can generate a better final commit message for the selected diff.
+
 ### Stage everything
 
 ```bash
 dash commit --all
 ```
 
-Same as `git commit --all`—stages tracked files before committing, then prompts to push.
+Stages all changed files before committing, then prompts to push.
 
 ### Multiple options
 
@@ -158,7 +180,7 @@ Shows popular models with your current selection highlighted.
 ### Set directly
 
 ```bash
-dash model set llama-3.3-70b-versatile
+dash model set openai/gpt-oss-120b
 ```
 
 Skip the prompt and set a model directly.
@@ -256,7 +278,7 @@ Dash handles big changes automatically. It summarizes stats and includes code sn
 ## Command reference
 
 ```bash
-dash commit [-g <n>] [-x <files>] [-a] [-t <type>]
+dash commit [-g <n>] [-x <files>] [-a] [-t <type>] [-m <context>]
 dash pr [create|list|view|merge] [-b <branch>] [-d] [-i <issue>] [-R <repo>]
 dash issue list [-s <state>] [-l <n>]
 dash model [list|set <model>]
@@ -269,12 +291,17 @@ dash setup
 ## Quick examples
 
 ```bash
-# Quick commit with auto-stage and push prompt
+# Quick commit with interactive staging and push prompt
 dash
 
-# Stage specific files and commit
-git add .
+# Commit staged files, or choose staging interactively if nothing is staged
 dash commit
+
+# Same as dash commit
+dash c
+
+# Give the AI extra context for the final message
+dash commit -m "chore: hide testimonials"
 
 # Generate 3 commit message options
 dash commit --all --generate 3
@@ -298,7 +325,7 @@ dash issue list --state all --limit 10
 dash model
 
 # Set specific model
-dash model set llama-3.3-70b-versatile
+dash model set openai/gpt-oss-120b
 
 # Install git hook for auto-generation
 dash hook install

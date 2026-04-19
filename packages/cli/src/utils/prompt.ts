@@ -46,7 +46,7 @@ ${JSON.stringify(
     revert: "Reverts a previous commit",
   },
   null,
-  2
+  2,
 )}
 
 IMPORTANT: 
@@ -59,17 +59,27 @@ IMPORTANT:
 export const generatePrompt = (
   locale: string,
   maxLength: number,
-  type: CommitType
+  type: CommitType,
 ) => {
-  const basePrompt = `You are a professional git commit message generator. Generate ONLY conventional commit messages.
+  const basePrompt =
+    `You are a professional git commit message generator. Generate ONLY conventional commit messages.
 
 CRITICAL RULES:
-- Return ONLY the commit message line, nothing else
-- Use format: type: subject (NO scope, just type and subject)
-- Maximum ${maxLength} characters (be concise but complete)
+- Return ONLY the commit message, nothing else
+- Always use a subject line formatted as: type: subject (NO scope, just type and subject)
+- The subject line must be at most ${maxLength} characters
 - Imperative mood, present tense
 - Be specific and descriptive
-- When there are multiple distinct changes, list them all or use "and more/other changes"
+- For small or focused diffs, return a single-line commit message only
+- For large diffs with several distinct meaningful changes, return:
+  type: short summary
+
+  - change 1
+  - change 2
+  - change 3
+- Only add bullet lines when they genuinely help explain multiple separate changes
+- Keep the body concise and use ` -
+    ` bullets for each major change
 - NO explanations, questions, or meta-commentary
 - ALWAYS complete the message - never truncate mid-sentence
 
@@ -96,15 +106,15 @@ COMMIT TYPES (use the right one):
 
 QUALITY GUIDELINES:
 - Start with the most important change
-- When there are multiple distinct changes (2-3 areas), list them all using "and" or commas
-- When there are many changes (4+), list the main ones and append "and other changes" or "and more"
+- If the changes fit cleanly in one subject line, prefer the single-line format
+- If the changes span several clear areas, keep the subject line broad and use bullets for the major changes
 - Use specific, descriptive language based on actual code changes
 - Include the main component/area affected when clear
 - Be clear about what was done, not just what files changed
 - Use proper grammar and punctuation
-- Prioritize completeness: better to acknowledge all major areas than to be overly brief
+- Prioritize completeness without hallucinating: mention only real changes from the diff
 
-CORRECT EXAMPLES (NO scope, just type and subject):
+CORRECT EXAMPLES:
 - feat: add user login with OAuth integration
 - feat: add sidebar, user profile page and API endpoints
 - feat: add branch summary command and update docs
@@ -115,6 +125,11 @@ CORRECT EXAMPLES (NO scope, just type and subject):
 - style: update navigation layout and other UI improvements
 - docs: update installation and configuration guide
 - chore: update axios to v1.6.0 for security patches
+- refactor: update commit flow and model selection
+
+  - add interactive file staging when no files are staged
+  - preserve multi-line commit bodies for larger diffs
+  - refresh the recommended Groq model list
 
 WRONG EXAMPLES (these are hallucinations - don't do this):
 - "feat: add collapsible sidebar" when diff only shows CSS changes
@@ -172,7 +187,7 @@ export const getSummaryPromptFile = async (): Promise<string | null> => {
 };
 
 export const generatePRSystemPrompt = (
-  customPrompt?: string | null
+  customPrompt?: string | null,
 ): string => {
   if (customPrompt) {
     return `You are a professional developer writing pull request descriptions. Follow the user's guidelines.`;
@@ -186,7 +201,7 @@ Use proper markdown formatting for the body.`;
 
 export const buildPRPrompt = (
   context: PRContext,
-  customPrompt?: string | null
+  customPrompt?: string | null,
 ): string => {
   const commitList = context.commits
     .map((c, i) => `${i + 1}. ${c.message}${c.body ? `\n   ${c.body}` : ""}`)
@@ -229,10 +244,10 @@ ${context.issue ? `RELATED ISSUE: #${context.issue}\n` : ""}
 COMMIT TYPES: ${commitTypeSummary || "unknown"}
 COMMITS (${context.commits.length} total):
 ${commitList}${
-    context.diffSummary
-      ? `\n\nDIFF SUMMARY (top files):\n${context.diffSummary}`
-      : ""
-  }`;
+  context.diffSummary
+    ? `\n\nDIFF SUMMARY (top files):\n${context.diffSummary}`
+    : ""
+}`;
 
   if (customPrompt) {
     return `${customPrompt}
@@ -280,7 +295,7 @@ BODY STRUCTURE:
 - Group by theme when multiple areas exist (e.g., Tooling, UI, Docs)
 - Use bullets with concrete details (what changed, where, and why)
 - Mention key files/components when clear from the diff summary
-${context.issue ? "\n## Related Issues\nCloses #" + context.issue : ""}
+${context.issue ? `\n## Related Issues\nCloses #${context.issue}` : ""}
 
 EXAMPLES OF GOOD PR DESCRIPTIONS:
 
@@ -323,7 +338,7 @@ Do not include any other text or explanations. Write a real, specific descriptio
 
 export const buildSummaryPrompt = (
   context: SummaryContext,
-  customPrompt?: string | null
+  customPrompt?: string | null,
 ): string => {
   const commitList = context.commits
     .map((c, i) => `${i + 1}. ${c.message}${c.body ? `\n   ${c.body}` : ""}`)
@@ -336,10 +351,10 @@ STATS: ${context.stats.files} files changed, +${context.stats.insertions} -${
   }
 COMMITS (${context.commits.length} total):
 ${commitList}${
-    context.diffSummary
-      ? `\n\nDIFF SUMMARY (top files):\n${context.diffSummary}`
-      : ""
-  }`;
+  context.diffSummary
+    ? `\n\nDIFF SUMMARY (top files):\n${context.diffSummary}`
+    : ""
+}`;
 
   if (customPrompt) {
     return `${customPrompt}

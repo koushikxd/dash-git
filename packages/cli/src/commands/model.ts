@@ -8,27 +8,35 @@ const GROQ_MODELS_URL = "https://console.groq.com/docs/models";
 
 const popularModels = [
   {
+    value: "openai/gpt-oss-120b",
+    label: "GPT OSS 120B",
+    hint: "Best overall",
+  },
+  {
+    value: "openai/gpt-oss-20b",
+    label: "GPT OSS 20B",
+    hint: "Default fast + capable",
+  },
+  {
+    value: "qwen/qwen3-32b",
+    label: "Qwen3 32B",
+    hint: "Reasoning and coding",
+  },
+  {
+    value: "meta-llama/llama-4-scout-17b-16e-instruct",
+    label: "Llama 4 Scout 17B 16E",
+    hint: "Vision + tool use",
+  },
+  {
     value: "llama-3.3-70b-versatile",
     label: "Llama 3.3 70B Versatile",
-    hint: "Best quality",
+    hint: "Strong general purpose",
   },
   {
     value: "llama-3.1-8b-instant",
     label: "Llama 3.1 8B Instant",
-    hint: "Fast responses",
+    hint: "Fastest production model",
   },
-  {
-    value: "llama-3.2-90b-vision-preview",
-    label: "Llama 3.2 90B Vision",
-    hint: "Vision capable",
-  },
-  {
-    value: "mixtral-8x7b-32768",
-    label: "Mixtral 8x7B",
-    hint: "Large context window",
-  },
-  { value: "gemma2-9b-it", label: "Gemma 2 9B", hint: "Google model" },
-  { value: "openai/gpt-oss-20b", label: "GPT OSS 20B", hint: "Default" },
 ];
 
 export default command(
@@ -39,7 +47,7 @@ export default command(
       description: "View or change the AI model used for generation",
       examples: [
         "dash model",
-        "dash model set llama-3.3-70b-versatile",
+        "dash model set openai/gpt-oss-120b",
         "dash model list",
       ],
     },
@@ -71,7 +79,7 @@ export default command(
       if (action === "set" && modelName) {
         await setConfigs([["model", modelName]]);
         console.log();
-        console.log(green("✓") + ` Model set to ${cyan(modelName)}`);
+        console.log(`${green("✓")} Model set to ${cyan(modelName)}`);
         console.log();
         return;
       }
@@ -118,7 +126,7 @@ export default command(
       if (selection === "__custom__") {
         const customModel = await p.text({
           message: "Enter model ID from Groq",
-          placeholder: "e.g., llama-3.3-70b-versatile",
+          placeholder: "e.g., openai/gpt-oss-120b",
           validate: (value) => {
             if (!value || value.trim().length === 0) {
               return "Model ID is required";
@@ -141,10 +149,10 @@ export default command(
 
       await setConfigs([["model", newModel]]);
 
-      p.outro(green("✓") + ` Model changed to ${cyan(newModel)}`);
+      p.outro(`${green("✓")} Model changed to ${cyan(newModel)}`);
     })().catch((error) => {
       handleCliError(error);
       process.exit(1);
     });
-  }
+  },
 );

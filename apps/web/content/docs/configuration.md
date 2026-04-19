@@ -18,7 +18,7 @@ Examples:
 
 ```bash
 dash config get GROQ_API_KEY
-dash config set model=llama-3.3-70b-versatile
+dash config set model=openai/gpt-oss-120b
 ```
 
 Set multiple at once:
@@ -55,22 +55,23 @@ This opens an interactive prompt to select from popular models or enter a custom
 
 ```bash
 dash model list
-dash model set llama-3.3-70b-versatile
+dash model set openai/gpt-oss-120b
 ```
 
 **Using config:**
 
 ```bash
-dash config set model=llama-3.3-70b-versatile
+dash config set model=openai/gpt-oss-120b
 ```
 
 **Popular models:**
 
-- `llama-3.3-70b-versatile` - Best quality
-- `llama-3.1-8b-instant` - Fast responses
-- `mixtral-8x7b-32768` - Large context window (good for big diffs)
-- `gemma2-9b-it` - Google model
-- `openai/gpt-oss-20b` - Default
+- `openai/gpt-oss-120b` - Best overall
+- `openai/gpt-oss-20b` - Default fast + capable option
+- `qwen/qwen3-32b` - Strong reasoning and coding
+- `meta-llama/llama-4-scout-17b-16e-instruct` - Vision + tool use
+- `llama-3.3-70b-versatile` - Strong general purpose
+- `llama-3.1-8b-instant` - Fastest production model
 
 Browse all available models at [console.groq.com/docs/models](https://console.groq.com/docs/models).
 
@@ -104,7 +105,7 @@ dash config set type=
 
 Default: `100`
 
-Max characters for commit messages (20-200).
+Max characters for the commit subject line (20-200). When dash generates a multi-line commit message for a larger diff, the bullet-point body can extend beyond this limit.
 
 ```bash
 dash config set max-length=72

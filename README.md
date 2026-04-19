@@ -27,8 +27,10 @@ export GROQ_API_KEY=gsk_your_key_here
 ## Quick start
 
 ```bash
-git add .
+dash
+
 dash commit
+dash c -m "chore: hide testimonials"
 
 dash pr
 ```
@@ -39,12 +41,20 @@ dash pr
 
 ```bash
 dash commit
+dash c
 
 dash commit --all
+dash commit -m "chore: hide testimonials"
 dash commit --generate 3
 dash commit --exclude dist/
 dash commit --type conventional
 ```
+
+`dash` now opens a staging selector before committing. "Stage all changed files" is selected by default, and you can switch to manual mode with the arrow keys to pick files with `Space` and submit with `Enter`.
+
+`dash commit` still works with already staged files. If nothing is staged, dash asks whether to stage everything or select files manually before it generates the message.
+
+For larger diffs, dash can now generate a multi-line commit message with a normal `type: subject` line followed by `- ` bullet points for the main changes.
 
 ### Pull requests
 
@@ -73,7 +83,7 @@ dash issue list --limit 10
 ```bash
 dash model
 dash model list
-dash model set llama-3.3-70b-versatile
+dash model set openai/gpt-oss-120b
 ```
 
 Change AI models interactively or directly. See all models at [console.groq.com/docs/models](https://console.groq.com/docs/models).
@@ -108,7 +118,7 @@ dash config get <key>
 Examples:
 
 ```bash
-dash config set model=llama-3.3-70b-versatile
+dash config set model=openai/gpt-oss-120b
 dash config set type=conventional max-length=72
 ```
 

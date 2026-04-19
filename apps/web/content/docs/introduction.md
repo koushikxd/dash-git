@@ -14,7 +14,7 @@ Dash fixes this. It analyzes your code changes and generates meaningful commit m
 ## Quick example
 
 ```bash
-dash # Auto-stages, commits, and prompts to push
+dash # Choose stage all or manual selection, then commit and push
 
 dash pr
 ```

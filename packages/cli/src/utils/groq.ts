@@ -21,7 +21,7 @@ const createChatCompletion = async (
   max_tokens: number,
   n: number,
   timeout: number,
-  proxy?: string
+  _proxy?: string,
 ) => {
   const client = new Groq({
     apiKey,
@@ -41,8 +41,8 @@ const createChatCompletion = async (
             presence_penalty,
             max_tokens,
             n: 1,
-          })
-        )
+          }),
+        ),
       );
 
       return {
@@ -77,7 +77,7 @@ const createChatCompletion = async (
 
       if (
         error.status === 413 ||
-        (error.message && error.message.includes("rate_limit_exceeded"))
+        error.message?.includes("rate_limit_exceeded")
       ) {
         errorMessage +=
           "\n\n💡 Tip: Your diff is too large. Try:\n" +
@@ -98,7 +98,7 @@ const createChatCompletion = async (
     ) {
       const err = error as { hostname?: string; syscall?: string };
       throw new KnownError(
-        `Error connecting to ${err.hostname} (${err.syscall}). Are you connected to the internet?`
+        `Error connecting to ${err.hostname} (${err.syscall}). Are you connected to the internet?`,
       );
     }
 
@@ -113,6 +113,54 @@ const sanitizeMessage = (message: string) =>
     .replace(/[\n\r]/g, "")
     .replace(/(\w)\.$/, "$1");
 
+const sanitizeCommitMessage = (message: string) => {
+  const cleaned = message
+    .trim()
+    .replace(/^```[\w-]*\n?/g, "")
+    .replace(/\n?```$/g, "")
+    .replace(/\r\n/g, "\n");
+
+  const lines = cleaned.split("\n");
+  const normalized: string[] = [];
+  let previousBlank = false;
+
+  for (const [index, rawLine] of lines.entries()) {
+    const trimmedRight = rawLine.trimEnd();
+    const trimmed = trimmedRight.trim();
+
+    if (!trimmed) {
+      if (!previousBlank && normalized.length > 0) {
+        normalized.push("");
+      }
+      previousBlank = true;
+      continue;
+    }
+
+    let line = trimmed;
+
+    if (index === 0) {
+      line = line.replace(/^["']|["']\.?$/g, "").replace(/(\w)\.$/, "$1");
+    }
+
+    if (/^[-*]\s+/.test(line)) {
+      line = `- ${line.replace(/^[-*]\s+/, "").trim()}`;
+    }
+
+    normalized.push(line);
+    previousBlank = false;
+  }
+
+  return normalized.join("\n").trim();
+};
+
+const normalizeCommitMessageLength = (message: string, maxLength: number) => {
+  const [subject, ...rest] = message.split("\n");
+  const safeSubject = enforceMaxLength(subject?.trim() || "", maxLength);
+  const body = rest.join("\n").trim();
+
+  return body ? `${safeSubject}\n\n${body}` : safeSubject;
+};
+
 const enforceMaxLength = (message: string, maxLength: number): string => {
   if (message.length <= maxLength) return message;
 
@@ -121,7 +169,7 @@ const enforceMaxLength = (message: string, maxLength: number): string => {
   const sentenceEnd = Math.max(
     cut.lastIndexOf(". "),
     cut.lastIndexOf("! "),
-    cut.lastIndexOf("? ")
+    cut.lastIndexOf("? "),
   );
 
   if (sentenceEnd > maxLength * 0.7) {
@@ -140,7 +188,7 @@ const enforceMaxLength = (message: string, maxLength: number): string => {
   }
 
   if (message.length > maxLength + 10) {
-    return cut + "...";
+    return `${cut}...`;
   }
 
   return cut;
@@ -164,12 +212,12 @@ const conventionalPrefixes = [
 
 const deriveMessageFromReasoning = (
   text: string,
-  maxLength: number
+  maxLength: number,
 ): string | null => {
   const cleaned = text.replace(/\s+/g, " ").trim();
 
   const match = cleaned.match(
-    /\b(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)\b\s*:?\s+[^.\n]+/i
+    /\b(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)\b\s*:?\s+[^.\n]+/i,
   );
   let candidate = match ? match[0] : cleaned.split(/[.!?]/)[0];
 
@@ -185,8 +233,8 @@ const deriveMessageFromReasoning = (
   const lower = candidate.toLowerCase();
   for (const prefix of conventionalPrefixes) {
     const p = prefix.slice(0, -1);
-    if (lower.startsWith(p + " ") && !lower.startsWith(prefix)) {
-      candidate = p + ": " + candidate.slice(p.length + 1);
+    if (lower.startsWith(`${p} `) && !lower.startsWith(prefix)) {
+      candidate = `${p}: ${candidate.slice(p.length + 1)}`;
       break;
     }
   }
@@ -210,7 +258,7 @@ export const generateCommitMessageFromSummary = async (
   maxLength: number,
   type: CommitType,
   timeout: number,
-  proxy?: string
+  proxy?: string,
 ) => {
   const prompt = summary;
   const completion = await createChatCompletion(
@@ -227,20 +275,24 @@ export const generateCommitMessageFromSummary = async (
     Math.max(300, maxLength * 12),
     completions,
     timeout,
-    proxy
+    proxy,
   );
 
   const messages = (completion.choices || [])
     .map((c) => c.message?.content || "")
-    .map((t) => sanitizeMessage(t as string))
+    .map((t) => sanitizeCommitMessage(t as string))
     .filter(Boolean)
     .map((t) => {
-      if (t.length > maxLength * 1.1) {
-        return enforceMaxLength(t, maxLength);
+      const [subject] = t.split("\n");
+      if ((subject?.length || 0) > maxLength * 1.1) {
+        return normalizeCommitMessageLength(t, maxLength);
       }
       return t;
     })
-    .filter((msg) => msg.length >= 10);
+    .filter((msg) => {
+      const [subject] = msg.split("\n");
+      return (subject?.trim().length || 0) >= 10;
+    });
 
   if (messages.length > 0) return deduplicateMessages(messages);
 
@@ -277,7 +329,7 @@ export const generatePRContent = async (
   timeout: number,
   proxy?: string,
   customPrompt?: string | null,
-  issue?: number
+  issue?: number,
 ): Promise<PRContent> => {
   const contextWithIssue = { ...context, issue };
 
@@ -295,7 +347,7 @@ export const generatePRContent = async (
     2000,
     1,
     timeout,
-    proxy
+    proxy,
   );
 
   const content = completion.choices?.[0]?.message?.content || "";
@@ -340,7 +392,7 @@ export const generatePRUpdateContent = async (
   context: PRContext,
   timeout: number,
   proxy?: string,
-  customPrompt?: string | null
+  _customPrompt?: string | null,
 ): Promise<PRContent> => {
   const systemPrompt = `You are a professional developer updating a pull request description.
 You will be given the current PR title and body, along with a user's request for changes.
@@ -386,7 +438,7 @@ Do not include any other text or explanations.`;
     1500,
     1,
     timeout,
-    proxy
+    proxy,
   );
 
   const content = completion.choices?.[0]?.message?.content || "";
@@ -409,7 +461,7 @@ export const generateMergeCommitMessage = async (
   prTitle: string,
   prBody: string,
   timeout: number,
-  proxy?: string
+  proxy?: string,
 ): Promise<string> => {
   const systemPrompt = `You are generating a concise merge commit message for a pull request.
 The message should summarize what the PR accomplishes in one line.
@@ -437,7 +489,7 @@ Generate a concise merge commit message. Return only the message, nothing else.`
     100,
     1,
     timeout,
-    proxy
+    proxy,
   );
 
   const content = completion.choices?.[0]?.message?.content || "";
@@ -452,7 +504,7 @@ export const generateBranchSummary = async (
   context: SummaryContext,
   timeout: number,
   proxy?: string,
-  customPrompt?: string | null
+  customPrompt?: string | null,
 ): Promise<string> => {
   const systemPrompt = `You are a professional developer writing branch summaries.
 Write clear, concise, and informative summaries that describe what happened in the branch.
@@ -474,7 +526,7 @@ Focus on WHAT changed and WHY. Use markdown formatting.`;
     2000,
     1,
     timeout,
-    proxy
+    proxy,
   );
 
   const content = completion.choices?.[0]?.message?.content || "";

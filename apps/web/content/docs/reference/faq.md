@@ -39,15 +39,16 @@ Get your key at [console.groq.com/keys](https://console.groq.com/keys).
 ### "No staged changes found"
 
 ```bash
-git add .
 dash commit
 ```
 
 Or:
 
 ```bash
-dash commit --all
+dash
 ```
+
+If nothing is staged, `dash commit` now prompts you to either stage all changed files or pick files manually with `Space` and `Enter`.
 
 ### "GitHub CLI (gh) not found"
 
@@ -108,7 +109,7 @@ Then `git commit` works normally. Dash generates the message.
 
 ### CLI vs hook mode?
 
-- **CLI** (`dash commit`) - Interactive, review before commit
+- **CLI** (`dash commit` / `dash c`) - Interactive, review before commit
 - **Hook** (`dash hook install`) - Auto-generates, opens in editor
 
 ### Conventional commits?

@@ -1,8 +1,11 @@
-import fs from "fs/promises";
+import fs from "node:fs/promises";
 import { intro, outro, spinner } from "@clack/prompts";
 import { black, green, red, bgCyan } from "kolorist";
 import { getStagedDiff, buildCompactSummary } from "~/utils/git.js";
-import { buildSingleCommitPrompt } from "~/commands/commit.js";
+import {
+  buildSingleCommitPrompt,
+  formatCommentedCommitMessage,
+} from "~/commands/commit.js";
 import { getConfig } from "~/utils/config.js";
 import { generateCommitMessageFromSummary } from "~/utils/groq.js";
 import { KnownError, handleCliError } from "~/errors.js";
@@ -13,7 +16,7 @@ export default () =>
   (async () => {
     if (!messageFilePath) {
       throw new KnownError(
-        'Commit message file path is missing. This file should be called from the "prepare-commit-msg" git hook'
+        'Commit message file path is missing. This file should be called from the "prepare-commit-msg" git hook',
       );
     }
 
@@ -44,7 +47,7 @@ export default () =>
         const enhanced = await buildSingleCommitPrompt(
           staged.files,
           compact,
-          config["max-length"]
+          config["max-length"],
         );
         messages = await generateCommitMessageFromSummary(
           config.GROQ_API_KEY,
@@ -55,14 +58,14 @@ export default () =>
           config["max-length"],
           config.type,
           config.timeout,
-          config.proxy
+          config.proxy,
         );
       } else {
-        const fileList = staged!.files.join(", ");
+        const fileList = staged.files.join(", ");
         const fallbackPrompt = await buildSingleCommitPrompt(
           staged.files,
           `Files: ${fileList}`,
-          config["max-length"]
+          config["max-length"],
         );
         messages = await generateCommitMessageFromSummary(
           config.GROQ_API_KEY,
@@ -73,7 +76,7 @@ export default () =>
           config["max-length"],
           config.type,
           config.timeout,
-          config.proxy
+          config.proxy,
         );
       }
     } finally {
@@ -98,8 +101,8 @@ export default () =>
           "# Select one of the following messages by uncommeting:\n";
       }
       instructions += `\n${messages
-        .map((message) => `# ${message}`)
-        .join("\n")}`;
+        .map((message) => formatCommentedCommitMessage(message))
+        .join("\n#\n")}`;
     } else {
       if (supportsComments) {
         instructions += "# Edit the message below and commit:\n";
